@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Blockfarm — DeFi Yield Farming Toolkit</title>
+<meta name="description" content="Blockfarm: track live DeFi yield farming pools across every chain, simulate compound APY growth, and calculate impermanent loss. Free, open-source, no API keys."/>
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg"/>
+<link rel="stylesheet" href="assets/css/style.css"/>
+</head>
+<body>
+
+<div class="bg-fx" aria-hidden="true">
+  <span class="blob b1"></span>
+  <span class="blob b2"></span>
+  <div class="grid-overlay"></div>
+</div>
+
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="#top">
+      <svg class="logo" viewBox="0 0 64 64" aria-hidden="true">
+        <defs>
+          <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#a3ff5e"/><stop offset="1" stop-color="#34d399"/>
+          </linearGradient>
+        </defs>
+        <rect x="8"  y="42" width="14" height="14" rx="3" fill="none" stroke="url(#lg)" stroke-width="2.5"/>
+        <rect x="25" y="47" width="14" height="14" rx="3" fill="none" stroke="url(#lg)" stroke-width="2.5" opacity=".75"/>
+        <rect x="42" y="42" width="14" height="14" rx="3" fill="none" stroke="url(#lg)" stroke-width="2.5" opacity=".5"/>
+        <path d="M32 46 C32 36 32 30 32 24" stroke="url(#lg)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <path d="M32 30 C23 30 18 23 18 15 C26 15 32 21 32 30 Z" fill="url(#lg)"/>
+        <path d="M32 26 C41 26 46 19 46 11 C38 11 32 17 32 26 Z" fill="url(#lg)" opacity=".8"/>
+      </svg>
+      <div class="brand-txt"><strong>Blockfarm</strong><small>DeFi Yield Toolkit</small></div>
+    </a>
+
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-tab="pools">🌾 Pools</button>
+      <button class="tab" data-tab="apy">📈 APY Calc</button>
+      <button class="tab" data-tab="il">⚖️ IL Calc</button>
+      <button class="tab" data-tab="watchlist">⭐ Watchlist <span class="pill" id="watchCount">0</span></button>
+    </nav>
+
+    <div class="net-badge" id="netBadge"><span class="dot"></span><span id="netLabel">connecting…</span></div>
+  </div>
+</header>
+
+<main class="wrap" id="top">
+
+  <section class="hero">
+    <h1>Farm smarter, <span class="grad">not harder.</span></h1>
+    <p class="sub">Live yield-pool intelligence on every chain — plus the two calculators every farmer actually needs.</p>
+    <div class="stats">
+      <div class="stat-card glass"><span class="stat-label">Pools tracked</span><span class="stat-value" id="statPools">—</span></div>
+      <div class="stat-card glass"><span class="stat-label">Combined TVL</span><span class="stat-value" id="statTvl">—</span></div>
+      <div class="stat-card glass"><span class="stat-label">Chains</span><span class="stat-value" id="statChains">—</span></div>
+      <div class="stat-card glass"><span class="stat-label">Median APY</span><span class="stat-value" id="statApy">—</span></div>
+    </div>
+  </section>
+
+  <!-- ==================== POOLS ==================== -->
+  <section id="tab-pools" class="tab-panel active">
+    <div class="toolbar glass">
+      <div class="field grow"><input id="search" type="search" placeholder="Search pool, project or chain… (e.g. USDC, Aave, Arbitrum)" autocomplete="off"/></div>
+      <div class="field"><select id="chainFilter"><option value="all">⛓ All chains</option></select></div>
+      <div class="field"><select id="tvlFilter">
+        <option value="0">Any TVL</option>
+        <option value="1000000">TVL ≥ $1M</option>
+        <option value="10000000" selected>TVL ≥ $10M</option>
+        <option value="100000000">TVL ≥ $100M</option>
+      </select></div>
+      <label class="switch-lbl"><span class="switch"><input type="checkbox" id="stableFilter"/><span class="slider"></span></span> Stables only</label>
+      <label class="switch-lbl"><span class="switch"><input type="checkbox" id="degenFilter" checked/><span class="slider"></span></span> Hide insane APY</label>
+      <div class="field"><select id="sortBy">
+        <option value="tvlUsd:desc">Sort · TVL ↓</option>
+        <option value="apy:desc">Sort · APY ↓</option>
+        <option value="apy:asc">Sort · APY ↑</option>
+        <option value="symbol:asc">Sort · A–Z</option>
+      </select></div>
+      <button class="btn ghost" id="refreshBtn" title="Refetch live data">↻ Refresh</button>
+    </div>
+    <p class="data-status" id="dataStatus">Loading pools…</p>
+
+    <div class="table-wrap glass">
+      <table id="poolTable">
+        <thead><tr>
+          <th></th><th>Pool</th><th>Project</th><th>Chain</th>
+          <th class="num">TVL</th><th class="num">APY</th><th>Risk</th><th>30d outlook</th><th></th>
+        </tr></thead>
+        <tbody id="poolRows"></tbody>
+      </table>
+      <div class="table-empty" id="tableEmpty" hidden>😢 No pools match your filters. Loosen up a little.</div>
+    </div>
+    <div class="table-foot">
+      <span id="tableStatus">—</span>
+      <button class="btn" id="loadMore">Load more 🚜</button>
+    </div>
+  </section>
+
+  <!-- ==================== APY CALC ==================== -->
+  <section id="tab-apy" class="tab-panel">
+    <div class="panel-head">
+      <h2>📈 Compound APY Simulator</h2>
+      <p class="muted">See what your harvest looks like with different compounding frequencies. Tip: hit <em>Simulate</em> on any pool to auto-fill its APY.</p>
+    </div>
+    <div class="calc-grid">
+      <div class="glass card form-card">
+        <label>Initial deposit (USD)
+          <input type="number" id="apyPrincipal" min="0" step="100" value="10000"/>
+        </label>
+        <label>Rate (% per year)
+          <input type="number" id="apyRate" min="0" step="0.1" value="25"/>
+        </label>
+        <label>Compounding
+          <select id="apyFreq">
+            <option value="365" selected>Daily (365×/yr)</option>
+            <option value="52">Weekly (52×/yr)</option>
+            <option value="12">Monthly (12×/yr)</option>
+            <option value="1">Yearly</option>
+            <option value="0">No compounding (simple)</option>
+          </select>
+        </label>
+        <label>Duration — <span id="apyMonthsLabel">12 months</span>
+          <input type="range" id="apyMonths" min="3" max="60" step="3" value="12"/>
+        </label>
+      </div>
+      <div class="glass card">
+        <div class="res-grid">
+          <div class="res"><span class="res-label">Final value</span><span class="res-value grad" id="resFinal">—</span></div>
+          <div class="res"><span class="res-label">Total yield</span><span class="res-value" id="resProfit">—</span></div>
+          <div class="res"><span class="res-label">Effective APY</span><span class="res-value" id="resEff">—</span></div>
+          <div class="res"><span class="res-label">Avg / month</span><span class="res-value" id="resPerMonth">—</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="glass card chart-card">
+      <div id="apyChart"></div>
+      <div class="legend">
+        <span class="key"><i style="background:#a3ff5e"></i> Compounded</span>
+        <span class="key"><i style="background:#5ea9ff"></i> No compounding</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== IL CALC ==================== -->
+  <section id="tab-il" class="tab-panel">
+    <div class="panel-head">
+      <h2>⚖️ Impermanent Loss Calculator</h2>
+      <p class="muted">You provide 50/50 liquidity. One token's price moves. This is what it costs you vs. simply HODLing.</p>
+    </div>
+    <div class="calc-grid">
+      <div class="glass card form-card">
+        <label>Position size (USD)
+          <input type="number" id="ilStart" min="0" step="100" value="10000"/>
+        </label>
+        <label>Token A price move (% vs. Token B)
+          <input type="number" id="ilMove" step="5" value="100"/>
+        </label>
+        <div class="chips">
+          <button class="chip" data-move="-75">−75%</button>
+          <button class="chip" data-move="-50">−50%</button>
+          <button class="chip" data-move="-25">−25%</button>
+          <button class="chip" data-move="50">+50%</button>
+          <button class="chip" data-move="100">+100%</button>
+          <button class="chip" data-move="300">+300%</button>
+        </div>
+      </div>
+      <div class="glass card">
+        <div class="res-grid">
+          <div class="res"><span class="res-label">Impermanent loss</span><span class="res-value red" id="ilResPct">—</span></div>
+          <div class="res"><span class="res-label">LP position value</span><span class="res-value" id="ilResLp">—</span></div>
+          <div class="res"><span class="res-label">If you just HODLed</span><span class="res-value" id="ilResHodl">—</span></div>
+          <div class="res"><span class="res-label">LP vs HODL difference</span><span class="res-value" id="ilResDiff">—</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="glass card chart-card">
+      <div id="ilChart"></div>
+      <div class="legend"><span class="key"><i style="background:#ff6b81"></i> IL % at price move (dot = your scenario)</span></div>
+    </div>
+  </section>
+
+  <!-- ==================== WATCHLIST ==================== -->
+  <section id="tab-watchlist" class="tab-panel">
+    <div class="panel-head">
+      <h2>⭐ Your Watchlist</h2>
+      <p class="muted">Starred pools live in your browser's local storage — no account, no tracking, fully private.</p>
+    </div>
+    <div class="table-wrap glass" id="wlWrap">
+      <table>
+        <thead><tr>
+          <th></th><th>Pool</th><th>Project</th><th>Chain</th>
+          <th class="num">TVL</th><th class="num">APY</th><th>Risk</th><th>30d outlook</th><th></th>
+        </tr></thead>
+        <tbody id="wlRows"></tbody>
+      </table>
+      <div class="table-empty" id="wlEmpty" hidden>🌱 Empty field. Go star some pools in the <strong>Pools</strong> tab.</div>
+    </div>
+    <p class="data-status" id="wlStatus"></p>
+  </section>
+
+</main>
+
+<footer class="wrap footer">
+  <p>🌾 <strong>Blockfarm</strong> — open-source DeFi farming toolkit. Pool data by <a href="https://defillama.com" target="_blank" rel="noopener">DefiLlama</a>.</p>
+  <p class="muted small">Educational tool. Not financial advice. APYs are variable, reward tokens volatile, smart contracts risky. Always DYOR before you ape. 🧑‍🌾</p>
+</footer>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script src="assets/js/app.js"></script>
+</body>
+</html>
